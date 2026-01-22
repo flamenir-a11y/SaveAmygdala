@@ -16,7 +16,7 @@
 
     <!-- טעינת הקוד -->
     <script type="module">
-        import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
+        import React, { useState, useEffect, useRef } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             AlertTriangle, Activity, Brain, Heart, Wind, ShieldAlert, 
@@ -31,6 +31,9 @@
             const [panicLevel, setPanicLevel] = useState(0);
             const [answeredQuestions, setAnsweredQuestions] = useState([]); 
             const [feedback, setFeedback] = useState('');
+            
+            // שימוש ב-ref כדי לנהל את הטיימר של הפידבק ולמנוע התנגשויות
+            const feedbackTimeoutRef = useRef(null);
 
             // 10 האתגרים של שיום הרגשות עם רמזים מינימליסטיים
             const challenges = [
@@ -140,26 +143,34 @@
             const handleTrapClick = (type) => {
                 setFeedback(`תגובת ${type} נכשלה! המערכת זקוקה לעיבוד קוגניטיבי. עונש זמן: -5 שניות.`);
                 setTimeLeft((prev) => Math.max(0, prev - 5));
-                setTimeout(() => setFeedback(''), 2000);
+                
+                if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+                feedbackTimeoutRef.current = setTimeout(() => setFeedback(''), 1500);
             };
 
             const activateCortex = () => {
                 setGameState('regulation');
                 setFeedback('הקורטקס הופעל. יש לזהות את 10 הרגשות במהירות! הטיימר ממשיך לרוץ.');
-                setTimeout(() => setFeedback(''), 3000);
+                
+                if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+                feedbackTimeoutRef.current = setTimeout(() => setFeedback(''), 3000);
             };
 
             const handleAnswer = (challengeId, selectedOption, correctOption) => {
+                // ניקוי טיימר קודם אם קיים כדי למנוע הבהובים
+                if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+
                 if (selectedOption === correctOption) {
                     if (!answeredQuestions.includes(challengeId)) {
                         setAnsweredQuestions(prev => [...prev, challengeId]);
                         setFeedback('זיהוי נכון! האמיגדלה מתקררת...');
-                        setTimeout(() => setFeedback(''), 1500);
+                        // זמן תצוגה מקוצר ל-750 מילישניות לתחושה מהירה יותר
+                        feedbackTimeoutRef.current = setTimeout(() => setFeedback(''), 750);
                     }
                 } else {
                     setFeedback('זיהוי רגש שגוי. האמיגדלה עדיין פעילה. עונש זמן: -3 שניות.');
                     setTimeLeft((prev) => Math.max(0, prev - 3));
-                    setTimeout(() => setFeedback(''), 1500);
+                    feedbackTimeoutRef.current = setTimeout(() => setFeedback(''), 1000);
                 }
             };
 
@@ -266,7 +277,11 @@
                             React.createElement('p', { className: "mb-6 text-slate-300 bg-slate-700/50 p-4 rounded border-r-4 border-blue-500" },
                                 React.createElement('strong', null, "המשימה:"), " זהו את 10 הרגשות בהתבסס על הדימוי והרמז הקצר. עליכם לסיים לפני שהטיימר מגיע ל-0."
                             ),
-                            feedback && React.createElement('div', { className: `p-2 rounded mb-4 text-center sticky top-0 z-10 font-bold ${feedback.includes('נכון') ? 'bg-green-900/50 text-green-200' : 'bg-yellow-900/50 text-yellow-200'}` }, feedback),
+                            // שינוי כאן: האלמנט תמיד מרונדר אך הופך לבלתי נראה כשיש פידבק ריק, כדי לשמור על גובה קבוע ולמנוע קפיצות
+                            React.createElement('div', { 
+                                className: `p-2 rounded mb-4 text-center sticky top-0 z-10 font-bold min-h-[3.5rem] flex items-center justify-center transition-all ${feedback ? (feedback.includes('נכון') ? 'bg-green-900/50 text-green-200' : 'bg-yellow-900/50 text-yellow-200') : 'invisible'}` 
+                            }, feedback || "placeholder"),
+                            
                             React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-5 gap-4" },
                                 challenges.map(challenge => {
                                     const isSolved = answeredQuestions.includes(challenge.id);
@@ -353,3 +368,4 @@
     </script>
 </body>
 </html>
+
